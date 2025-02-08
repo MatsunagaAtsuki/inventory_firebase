@@ -1,29 +1,28 @@
-const functions = require("firebase-functions"); // ダブルクオートを使用
-const pool = require("./db"); // ダブルクオートを使用
+exports.getProductByBarcode = functions.https.onCall(async (data, context) => {
+  const barcode = data.barcode;
 
-// 商品ID（バーコード）を基に商品情報を取得する関数
-exports.getProductByBarcode = functions.https.onRequest((req, res) => {
-  const barcode = req.query.barcode;
+  console.log("受信したバーコード:", barcode); // デバッグ用
 
-  if (!barcode) {
-    return res.status(400).send("Barcode is required"); // ダブルクオートを使用
+  if (!barcode || barcode.length < 5) {
+    console.log("無効なバーコード");
+    throw new functions.https.HttpsError("invalid-argument", "Invalid barcode.");
   }
 
-  // SQLクエリ
-  const query = "SELECT * FROM products WHERE barcode = ?"; // ダブルクオートを使用
+  const query = "SELECT * FROM products WHERE barcode = ?";
 
-  // クエリの実行
-  pool.query(query, [barcode], (err, results) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).send("Database error"); // ダブルクオートを使用
-    }
+  try {
+    const [results] = await pool.promise().query(query, [barcode]);
+
+    console.log("データベースからの結果:", results); // デバッグ用
 
     if (results.length === 0) {
-      return res.status(404).send("Product not found"); // ダブルクオートを使用
+      console.log("商品が見つかりません");
+      throw new functions.https.HttpsError("not-found", "Product not found.");
     }
 
-    // 結果をJSON形式で返す
-    res.json(results[0]);
-  });
+    return results[0]; // JSON形式で返す
+  } catch (error) {
+    console.error("Database error:", error.sqlMessage || error.message);
+    throw new functions.https.HttpsError("internal", "Database error.");
+  }
 });
