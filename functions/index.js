@@ -1,36 +1,16 @@
 const functions = require("firebase-functions");
-const pool = require("./db");
+const admin = require("firebase-admin");
+const pool = require("./mysqlPool"); // 接続プールのインポート
 
-exports.getProductByBarcode = functions.https.onCall(async (data, context) => {
-  console.log("リクエスト受信:", data); // リクエストデータをログに出力
+admin.initializeApp();
 
-  const barcode = data.barcode; // 修正: req.query ではなく data.barcode を使う
-  if (!barcode) {
-    console.error("エラー: バーコードが提供されていません");
-    throw new functions.https.HttpsError("invalid-argument", "Barcode is required");
-  }
-
-  const query = "SELECT * FROM products WHERE barcode = ?";
-  console.log(`実行するSQL: ${query}, パラメータ: ${barcode}`);
-
-  return new Promise((resolve, reject) => {
-    pool.query(query, [barcode], (err, results) => {
-      if (err) {
-        console.error("データベースエラー:", err);
-        reject(new functions.https.HttpsError("internal", "Database error"));
-        return;
-      }
-
-      console.log("クエリ結果:", results);
-
-      if (results.length === 0) {
-        console.warn("警告: バーコードに該当する商品が見つかりません");
-        reject(new functions.https.HttpsError("not-found", "Product not found"));
-        return;
-      }
-
-      console.log("商品情報:", results[0]);
-      resolve(results[0]);
-    });
+exports.getDataFromMySQL = functions.https.onRequest((req, res) => {
+  // クエリをプールを使って実行
+  pool.query('SELECT * FROM your_table_name', (error, results, fields) => {
+    if (error) {
+      res.status(500).send("Error fetching data from MySQL: " + error);
+      return;
+    }
+    res.status(200).send(results); // データをクライアントに返す
   });
 });
